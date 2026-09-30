@@ -17,6 +17,7 @@ make mlflow-ui         # http://localhost:5000
 ## Ingestion
 
 ```bash
+uv run python -m pricefc ingest prices -z SE1 -z SE2 -z SE3 -z SE4      # resumable, per month
 uv run python -m pricefc ingest weather historical_forecast --zone SE3   # training history
 uv run python -m pricefc ingest weather previous_runs --zone SE3         # true-lead, backtests
 uv run python -m pricefc ingest weather forecast --zone SE3              # live, archived as issued
@@ -30,3 +31,6 @@ to the MLflow `ingest` experiment. Validation failures are kept but marked, and 
 exits non-zero.
 
 Weather data: [Open-Meteo](https://open-meteo.com/), CC BY 4.0.
+Electricity prices: [elprisetjustnu.se](https://www.elprisetjustnu.se/).
+
+`make test` runs offline tests only; `make test-live` checks the real APIs.

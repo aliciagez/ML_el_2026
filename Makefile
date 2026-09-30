@@ -1,4 +1,4 @@
-.PHONY: install lint typecheck test check mlflow-ui
+.PHONY: install lint typecheck test test-live check mlflow-ui
 
 install:
 	uv sync --all-extras
@@ -12,6 +12,9 @@ typecheck:
 
 test:
 	uv run pytest
+
+test-live:
+	uv run pytest -m live -v
 
 check: lint typecheck test
 

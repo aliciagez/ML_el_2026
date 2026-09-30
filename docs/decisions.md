@@ -38,3 +38,21 @@
 - **First SE3 weather backfill has no commit SHA**: the 20 snapshots pulled on 2026-09-30 before
   the first commit record `git_sha: unknown, git_dirty: true`. They are kept, but superseded by a
   re-pull made from a committed tree, and dataset builds should use the re-pulled snapshots.
+
+## 2026-09-30 — Prices from elprisetjustnu.se (ENTSO-E token pending)
+- **Target source**: `prices.source: elprisetjustnu` in `configs/ingest.yaml`. Pluggable
+  `PriceSource` (elprisetjustnu, entsoe) with one output schema; the snapshot `source` records
+  which produced each series. ENTSO-E remains the intended source of record; when the token
+  arrives, pull the same days from both and compare (this doubles as real-API validation).
+- **Coverage**: 2021-11-01 onwards for SE1-SE4 (probed; 2021-10-31 is 404). Prices exclude VAT
+  and taxes. EUR/kWh x 1000 = EUR/MWh (5 decimals, so exact to 0.01). Attribution to
+  elprisetjustnu.se is recorded in every manifest and required for public use.
+- **Snapshot granularity**: one snapshot per zone and calendar month (~240 total), not per day.
+  Resumable: complete months with a valid snapshot are skipped; the current month is re-pulled.
+- **API quirks**: the default Python user agent gets HTTP 403, so the client sends its own.
+  `time_end` is computed in wall-clock time, so the last slot before the autumn DST change
+  claims 75 minutes; resolution is therefore derived from `time_start` spacing and
+  inconsistent `time_end` values are listed in the manifest (`time_end_anomalies`).
+- **Energy crisis**: history starts in the 2021-22 price crisis. Report backtest scores with and
+  without that period (decide in M3 whether evaluation starts after it).
+- **Live tests**: `make test-live` hits the real APIs (one day per dataset); skipped by default.
