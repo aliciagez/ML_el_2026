@@ -139,7 +139,22 @@ class EntsoeConfig(_Strict):
     hydro_reservoir_area: str
 
 
+class PricesConfig(_Strict):
+    source: Literal["elprisetjustnu", "entsoe"]
+
+
+class ElprisConfig(_Strict):
+    url_template: str
+    start: date
+    min_interval_s: float = Field(ge=0)
+    max_retries: int = Field(ge=0)
+    timeout_s: float = Field(gt=0)
+    user_agent: str
+
+
 class IngestConfig(_Strict):
+    prices: PricesConfig
+    elprisetjustnu: ElprisConfig
     open_meteo: OpenMeteoConfig
     entsoe: EntsoeConfig
 

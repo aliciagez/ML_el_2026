@@ -34,6 +34,22 @@ open_meteo:
       forecast_days: 3
       max_null_frac: 0.05   # the live tail can be shorter than requested
 
+prices:
+  # Target series source (pluggable). ENTSO-E is the intended source of record once a token
+  # exists; until then elprisetjustnu.se, cross-checked against ENTSO-E later.
+  source: elprisetjustnu
+
+elprisetjustnu:
+  # One static JSON file per local (Europe/Stockholm) day and zone. No key. Prices exclude VAT
+  # and taxes. Credit elprisetjustnu.se when prices are used publicly.
+  url_template: "https://www.elprisetjustnu.se/api/v1/prices/{year}/{month_day}_{zone}.json"
+  start: "2021-11-01"     # first available day for SE1-SE4 (probed 2026-09-30)
+  min_interval_s: 0.5
+  max_retries: 5
+  timeout_s: 30
+  # The default Python user agent is rejected with HTTP 403.
+  user_agent: "pricefc/0.1 (day-ahead price forecasting research)"
+
 entsoe:
   min_interval_s: 0.5     # reported limit is 400 requests/minute
   max_retries: 3

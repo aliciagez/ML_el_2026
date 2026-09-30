@@ -15,6 +15,7 @@ import importlib.metadata
 import json
 import os
 import re
+import time
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -78,6 +79,19 @@ def snapshot_dir(raw_root: Path, source: str, dataset: str, key: str, pulled_at:
             raise ValueError(f"unsafe path component: {part!r}")
     stamp = pulled_at.astimezone(UTC).strftime(PULLED_AT_FMT)
     return raw_root / source / dataset / key / f"pulled_at={stamp}"
+
+
+def fresh_pulled_at(raw_root: Path, source: str, dataset: str, key: str) -> datetime:
+    """Current UTC time (whole seconds) not yet used by a snapshot of this series.
+
+    Snapshot directories are named to the second; if one exists already, wait for the next
+    second rather than altering the recorded pull time.
+    """
+    while True:
+        now = datetime.now(UTC).replace(microsecond=0)
+        if not snapshot_dir(raw_root, source, dataset, key, now).exists():
+            return now
+        time.sleep(1.05 - datetime.now(UTC).microsecond / 1e6)
 
 
 def write_snapshot(

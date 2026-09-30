@@ -145,6 +145,46 @@ def ingest_entsoe_cmd(
     _finish(results, "entsoe", zones, base, "none")
 
 
+@ingest_app.command("prices")
+def ingest_prices_cmd(
+    zone: list[str] | None = ZONE_OPT,
+    start: datetime | None = START_OPT,
+    end: datetime | None = END_OPT,
+    source: str | None = typer.Option(None, help="Override prices.source from ingest config."),
+    force: bool = typer.Option(False, help="Re-pull months that already have a snapshot."),
+    config: Path = CONFIG_OPT,
+    ingest_config: Path = INGEST_OPT,
+) -> None:
+    """Pull day-ahead prices (local delivery days) per zone and month. Resumable."""
+    from zoneinfo import ZoneInfo
+
+    from pricefc.config import load_ingest_config
+    from pricefc.ingest.prices import ElprisSource, EntsoePriceSource, PriceSource
+    from pricefc.ingest.run import ingest_prices, make_entsoe_client
+
+    base = load_config(config)
+    ing = load_ingest_config(ingest_config)
+    zones = zone or list(base.zones)
+    name = source or ing.prices.source
+    src: PriceSource
+    if name == "elprisetjustnu":
+        src = ElprisSource(ing.elprisetjustnu)
+        default_first = ing.elprisetjustnu.start
+    elif name == "entsoe":
+        src = EntsoePriceSource(ing.entsoe, make_entsoe_client())
+        default_first = ing.entsoe.history_start
+    else:
+        raise typer.BadParameter(f"unknown price source {name!r}")
+    today = datetime.now(ZoneInfo(base.timezone)).date()
+    first = _date(start) or default_first
+    last = _date(end) or today
+    results = ingest_prices(base, src, zones, first, last, force=force)
+    if not results:
+        typer.echo("nothing to do: all months already stored")
+        return
+    _finish(results, f"prices-{name}", zones, base, "none")
+
+
 @app.command()
 def snapshots(config: Path = CONFIG_OPT) -> None:
     """List raw snapshots with row counts and validation status."""

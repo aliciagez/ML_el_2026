@@ -13,7 +13,8 @@ import structlog
 from pricefc.config import BaseConfig, FeaturesConfig, IngestConfig, Location
 from pricefc.ingest import entsoe as es
 from pricefc.ingest import openmeteo as om
-from pricefc.ingest.snapshot import Snapshot, write_snapshot
+from pricefc.ingest.prices import PriceSource, month_ranges
+from pricefc.ingest.snapshot import Snapshot, fresh_pulled_at, list_snapshots, write_snapshot
 from pricefc.validate.schemas import ValidationReport, validate_series
 from pricefc.validate.specs import entsoe_spec, weather_spec
 
@@ -61,7 +62,7 @@ def ingest_weather(
                 raise ValueError(f"no start date for {endpoint}")
             e = end or now_utc().date() - timedelta(days=1)  # last complete UTC day
             pull = client.fetch_range(endpoint, loc, s, e)
-        pulled_at = now_utc()
+        pulled_at = fresh_pulled_at(base.paths.raw, om.SOURCE, pull.dataset, loc.name)
         spec = weather_spec(
             pull.dataset, list(pull.data.columns), max_null_frac=ep_cfg.max_null_frac
         )
@@ -127,7 +128,7 @@ def ingest_entsoe(
     results = []
     for job in jobs:
         pull = fetcher.fetch(job, s, e)
-        pulled_at = now_utc()
+        pulled_at = fresh_pulled_at(base.paths.raw, es.SOURCE, job.dataset, job.key)
         report = validate_series(
             pull.data,
             entsoe_spec(job.dataset),
@@ -206,3 +207,68 @@ def log_ingest_run(
             )
         mlflow.log_text(json.dumps(index, indent=2), "snapshots.json")
         return str(run.info.run_id)
+
+
+def _month_done(base: BaseConfig, source: str, zone: str, first: date, last: date) -> bool:
+    for snap in list_snapshots(base.paths.raw, source, "day_ahead_prices", zone):
+        q = snap.manifest["query"]
+        if (
+            q.get("first_day", "") <= first.isoformat()
+            and q.get("last_day", "") >= last.isoformat()
+        ):
+            return True
+    return False
+
+
+def ingest_prices(
+    base: BaseConfig,
+    source: PriceSource,
+    zones: list[str],
+    first: date,
+    last: date,
+    *,
+    force: bool = False,
+) -> list[IngestResult]:
+    """Pull prices per zone and calendar month; complete months already stored are skipped.
+
+    Resumable: an interrupted backfill restarts at the first month without a valid snapshot.
+    The month containing `last` is re-pulled on every run unless `last` is its final day.
+    """
+    results = []
+    for zone in zones:
+        for m_first, m_last in month_ranges(first, last):
+            if not force and _month_done(base, source.name, zone, m_first, m_last):
+                continue
+            pull = source.fetch_prices(zone, m_first, m_last, base.timezone)
+            pulled_at = fresh_pulled_at(base.paths.raw, source.name, "day_ahead_prices", zone)
+            report = validate_series(
+                pull.data,
+                entsoe_spec("day_ahead_prices"),
+                tz=base.timezone,
+                requested_start=pull.requested_start,
+                requested_end=pull.requested_end,
+            )
+            snap = write_snapshot(
+                pull.data,
+                raw_root=base.paths.raw,
+                source=source.name,
+                dataset="day_ahead_prices",
+                key=zone,
+                endpoint=pull.endpoint,
+                query=pull.query,
+                requested_start=pull.requested_start,
+                requested_end=pull.requested_end,
+                pulled_at=pulled_at,
+                validation=report.summary(),
+                extra={"chunks": pull.chunks, "price_source": source.name, **pull.extra},
+            )
+            log.info(
+                "snapshot_written",
+                source=source.name,
+                zone=zone,
+                month=m_first.strftime("%Y-%m"),
+                rows=len(pull.data),
+                valid=report.passed,
+            )
+            results.append(IngestResult(snap, report))
+    return results

@@ -16,7 +16,14 @@ import pandas as pd
 import pandera.pandas as pa
 from pandera.errors import SchemaErrors, SchemaWarning
 
-from pricefc.timeutils import RESOLUTION_STEPS, expected_periods, local_day_bounds_utc
+from pricefc.timeutils import (
+    MTU15_GO_LIVE,
+    PT15M,
+    PT60M,
+    RESOLUTION_STEPS,
+    expected_periods,
+    local_day_bounds_utc,
+)
 
 
 @dataclass(frozen=True)
@@ -169,7 +176,9 @@ def _day_count_errors(
                     errors.append({"check": "day_resolution", "day": str(day), "got": res_values})
                     day += timedelta(days=1)
                     continue
-                res = res_values[0] if res_values else None
+                # A day with no rows: expect the market's resolution for that delivery day.
+                default = PT15M if day >= MTU15_GO_LIVE else PT60M
+                res = res_values[0] if res_values else default
             else:
                 res = spec.step
             got = int(counts.get(day, 0))
