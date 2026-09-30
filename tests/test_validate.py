@@ -91,3 +91,17 @@ def test_weather_nulls_and_ranges() -> None:
 def test_unknown_weather_column_has_no_range() -> None:
     with pytest.raises(KeyError):
         weather_spec("w", ["timestamp", "mystery"])
+
+
+def test_slightly_negative_radiation_is_flagged_not_rejected() -> None:
+    ts = pd.date_range("2025-10-28", periods=24, freq="h", tz="UTC")
+    df = pd.DataFrame({"timestamp": ts, "shortwave_radiation_previous_day2": 0.0})
+    df.loc[20, "shortwave_radiation_previous_day2"] = -1.0
+    report = validate_series(
+        df,
+        weather_spec("w", list(df.columns)),
+        tz="UTC",
+        requested_start=ts[0],
+        requested_end=ts[-1] + pd.Timedelta("1h"),
+    )
+    assert report.passed and report.warnings

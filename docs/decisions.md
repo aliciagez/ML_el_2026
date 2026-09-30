@@ -56,3 +56,6 @@
 - **Energy crisis**: history starts in the 2021-22 price crisis. Report backtest scores with and
   without that period (decide in M3 whether evaluation starts after it).
 - **Live tests**: `make test-live` hits the real APIs (one day per dataset); skipped by default.
+- **Negative night-time radiation**: Previous Runs returned `shortwave_radiation = -1 W/m2` at
+  night (SE1/SE2, 2025-10-28 20:00Z). Radiation now allows down to -5 W/m2 with a warning below
+  0; values are kept as delivered (clipping, if any, belongs in feature building).

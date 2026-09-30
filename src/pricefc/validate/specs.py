@@ -18,7 +18,8 @@ WEATHER_RANGES: dict[str, ColumnSpec] = {
     "wind_speed": ColumnSpec(min=0, max=80),
     "wind_direction": ColumnSpec(min=0, max=360),
     "cloud_cover": ColumnSpec(min=0, max=100),
-    "shortwave_radiation": ColumnSpec(min=0, max=1500),
+    # Model output can dip slightly below zero at night (seen: -1 W/m2); flag, keep as is.
+    "shortwave_radiation": ColumnSpec(min=-5, max=1500, warn_below=0),
     "precipitation": ColumnSpec(min=0, max=300),
     "snowfall": ColumnSpec(min=0, max=200),
 }
@@ -67,7 +68,12 @@ def weather_spec(dataset: str, columns: list[str], *, max_null_frac: float = 0.0
     for col in columns:
         for prefix, rng in WEATHER_RANGES.items():
             if col.startswith(prefix):
-                specs[col] = ColumnSpec(min=rng.min, max=rng.max, max_null_frac=max_null_frac)
+                specs[col] = ColumnSpec(
+                    min=rng.min,
+                    max=rng.max,
+                    warn_below=rng.warn_below,
+                    max_null_frac=max_null_frac,
+                )
                 break
         else:
             if col != "timestamp":
