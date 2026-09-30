@@ -59,3 +59,24 @@
 - **Negative night-time radiation**: Previous Runs returned `shortwave_radiation = -1 W/m2` at
   night (SE1/SE2, 2025-10-28 20:00Z). Radiation now allows down to -5 W/m2 with a warning below
   0; values are kept as delivered (clipping, if any, belongs in feature building).
+
+## 2026-10-01 — Price backfill verified against independent sources
+- **Backfill**: elprisetjustnu.se, SE1-SE4, 2021-11-01 to 2026-09-30: 233 of 236 zone-months
+  valid.
+- **Nord Pool** (the exchange; its public data portal API is open only for about the last two
+  months): 40 zone-days in Aug-Sep 2026, all four zones, 3,840 quarter-hours. Identical to the
+  cent.
+- **Energy-Charts** (licence: private/internal use only; used for this check only, not as a
+  data source): 12 stress days x 4 zones (DST days in both hourly and 15-minute eras, the
+  2025-10-01 switch, the Aug 2022 crisis peak, ordinary days), 2,015 intervals. 47 of 48
+  zone-days identical, and the one exception is a known gap day.
+- **Source defect found**: on 5 days elprisetjustnu dropped one hour mid-day and shifted every
+  later hour one slot earlier (the last hour is empty): SE3 2021-11-04 (from 13:00, up to
+  53 EUR/MWh off), SE2 2022-09-04, 2022-09-10, 2022-09-15 and 2022-10-20 (up to 139 EUR/MWh
+  off). All five have 23 rows, so validation catches them, and their months (SE3 2021-11,
+  SE2 2022-09, SE2 2022-10) are marked invalid. **These values are wrong, not just
+  incomplete; never repair them by filling the missing hour.** Replace those days from ENTSO-E
+  once the token is available.
+- **Residual risk**: a shift inside a day that keeps the correct row count would pass
+  validation. The sample showed none, but full coverage needs the ENTSO-E comparison of every
+  day. Do it when the token arrives, before the price series is used as the source of record.
